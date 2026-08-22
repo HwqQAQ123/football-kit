@@ -13,8 +13,8 @@ FB.api = (function () {
   // API-Football 默认抓取的联赛/赛季（英超 2023-24），可改
   var AF_LEAGUE = 39, AF_SEASON = 2023;
   function load() {
-    try { return JSON.parse(localStorage.getItem(KEY)) || { provider: "mock", key: "" }; }
-    catch (e) { return { provider: "mock", key: "" }; }
+    try { return JSON.parse(localStorage.getItem(KEY)) || { provider: "openligadb", key: "" }; }
+    catch (e) { return { provider: "openligadb", key: "" }; }
   }
   function save(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (e) {} }
 
@@ -145,7 +145,8 @@ FB.api = (function () {
       key: "openligadb", name: "OpenLigaDB · 德甲真实数据（免费·无需 Key）", needKey: false,
       list: function () {
         return fetch("https://api.openligadb.de/getmatchdata/bl1")
-          .then(function (r) { return r.json(); }).then(mapOpenLiga);
+          .then(function (r) { return r.json(); }).then(mapOpenLiga)
+          .catch(function () { return FB.MATCHES; });  // 离线/请求失败回退示例，避免卡加载
       },
       // 免费接口提供真实赛程/比分，不含 xG/射门坐标；拉详情仅展示球队与比分
       match: function (id) {
