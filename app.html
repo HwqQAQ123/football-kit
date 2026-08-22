@@ -28,6 +28,7 @@
 </div>
 
 <script src="assets/data.js"></script>
+<script src="assets/bl1_real.js"></script>
 <script src="assets/api.js"></script>
 <script>
 var APP = (function () {
@@ -73,11 +74,13 @@ var APP = (function () {
     }).join("");
     var src = FB.api.load().provider;
     var isRealSrc = src !== "mock";
+    var srcLabel = src === "mock" ? "示例数据"
+      : (src === "local_bl1" ? "真实德甲(离线缓存)" : "真实接口:" + src);
     var failBanner = failed && isRealSrc
       ? '<div class="disclaimer" style="margin-bottom:10px">⚠️ 真实接口请求失败：' + esc(errMsg) + '。你现在看到的是<b>示例数据</b>（蓝鲸/红狼等队名是虚构的），不是真实球队。可能是因为你的网络连不到 OpenLigaDB，可尝试开启加速器后刷新。</div>'
       : '';
-    var toggleBtn = '<button class="btn" style="margin-left:10px" onclick="APP.toggleReal()">' + (src === "mock" ? "看真实德甲 →" : "← 回示例数据") + '</button>';
-    el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心 <span class="pill">' + (src === "mock" ? "示例数据" : "真实接口:" + src) + '</span>' + toggleBtn + '</h2>' + failBanner + pills + (cards || '<div class="note">暂无比赛</div>');
+    var toggleBtn = '<button class="btn" style="margin-left:10px" onclick="APP.toggleReal()">' + (src === "mock" ? "看真实德甲(离线) →" : "← 回示例数据") + '</button>';
+    el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心 <span class="pill">' + srcLabel + '</span>' + toggleBtn + '</h2>' + failBanner + pills + (cards || '<div class="note">暂无比赛</div>');
   }
   function detailView(id, realMatch) {
     var m = matchesCache.find(function (x) { return x.id === id; });
@@ -249,7 +252,7 @@ var APP = (function () {
     filter: function (l) { filterLeague = l; renderMatches(); },
     toggleReal: function () {
       var c = FB.api.load();
-      var np = c.provider === "mock" ? "openligadb" : "mock";
+      var np = c.provider === "mock" ? "local_bl1" : "mock";
       FB.api.save({ provider: np, key: "" });
       loadMatches();
     },

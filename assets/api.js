@@ -13,8 +13,12 @@ FB.api = (function () {
   // API-Football 默认抓取的联赛/赛季（英超 2023-24），可改
   var AF_LEAGUE = 39, AF_SEASON = 2023;
   function load() {
-    try { return JSON.parse(localStorage.getItem(KEY)) || { provider: "openligadb", key: "" }; }
-    catch (e) { return { provider: "openligadb", key: "" }; }
+    try {
+      var c = JSON.parse(localStorage.getItem(KEY)) || { provider: "local_bl1", key: "" };
+      if (c.provider === "openligadb") c.provider = "local_bl1"; // 离线缓存等价，避免联网连不上
+      return c;
+    }
+    catch (e) { return { provider: "local_bl1", key: "" }; }
   }
   function save(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (e) {} }
 
@@ -22,13 +26,13 @@ FB.api = (function () {
   function mapOpenLiga(list) {
     if (!Array.isArray(list)) return [];
     return list.slice(0, 12).map(function (m, i) {
-      var t1 = m.Team1 ? m.Team1.TeamName : "?", t2 = m.Team2 ? m.Team2.TeamName : "?";
-      var res = m.MatchResults && m.MatchResults[0];
-      var score = res ? res.PointsTeam1 + "-" + res.PointsTeam2 : "VS";
-      var dt = m.MatchDateTime ? m.MatchDateTime.replace("T", " ").slice(0, 16) : "";
-      var fin = !!m.MatchIsFinished;
+      var t1 = m.team1 ? m.team1.teamName : "?", t2 = m.team2 ? m.team2.teamName : "?";
+      var res = m.matchResults && m.matchResults[0];
+      var score = res ? res.pointsTeam1 + "-" + res.pointsTeam2 : "VS";
+      var dt = m.matchDateTime ? m.matchDateTime.replace("T", " ").slice(0, 16) : "";
+      var fin = !!m.matchIsFinished;
       return {
-        id: "ol" + m.MatchID, league: "德甲 Bundesliga", home: t1, away: t2,
+        id: "ol" + m.matchID, league: (m.leagueName || "德甲 Bundesliga"), home: t1, away: t2,
         time: dt, status: fin ? "完场" : "未开赛", score: fin ? score : "VS", hot: i < 3,
         source: "openligadb"
       };
@@ -136,6 +140,21 @@ FB.api = (function () {
 
   // ---------- 数据源（provider） ----------
   var providers = {
+    local_bl1: {
+      key: "local_bl1", name: "德甲真实数据（离线缓存·双击即用）", needKey: false,
+      list: function () { return Promise.resolve(window.FB_LOCAL_BL1 || []); },
+      match: function (id) {
+        var arr = window.FB_LOCAL_BL1 || [];
+        var m = arr.find(function (x) { return x.id === id; });
+        if (!m) return Promise.resolve(null);
+        return Promise.resolve({
+          home: { name: m.home, score: m.score === "VS" ? 0 : parseInt(m.score.split("-")[0]) || 0 },
+          away: { name: m.away, score: m.score === "VS" ? 0 : parseInt(m.score.split("-")[1]) || 0 },
+          competition: m.league, date: m.time, score: m.score,
+          finished: m.status === "完场", source: "openligadb_local", _real: true
+        });
+      }
+    },
     mock: {
       key: "mock", name: "示例数据（离线·默认）", needKey: false,
       list: function () { return Promise.resolve(FB.MATCHES); },
@@ -154,18 +173,21 @@ FB.api = (function () {
       match: function (id) {
         var mid = String(id).replace(/^ol/, "");
         return fetch("https://api.openligadb.de/getmatchdata/" + mid)
-          .then(function (r) { return r.json(); })
+          .then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          })
           .then(function (arr) {
             var m = Array.isArray(arr) ? arr[0] : arr;
             if (!m) return null;
-            var res = m.MatchResults && m.MatchResults[0];
-            var fin = !!m.MatchIsFinished;
-            var score = res ? res.PointsTeam1 + "-" + res.PointsTeam2 : "VS";
+            var res = m.matchResults && m.matchResults[0];
+            var fin = !!m.matchIsFinished;
+            var score = res ? res.pointsTeam1 + "-" + res.pointsTeam2 : "VS";
             return {
-              home: { name: m.Team1 ? m.Team1.TeamName : "?", score: res ? res.PointsTeam1 : 0 },
-              away: { name: m.Team2 ? m.Team2.TeamName : "?", score: res ? res.PointsTeam2 : 0 },
-              competition: m.LeagueName || "德甲 Bundesliga",
-              date: (m.MatchDateTime || "").replace("T", " ").slice(0, 16),
+              home: { name: m.team1 ? m.team1.teamName : "?", score: res ? res.pointsTeam1 : 0 },
+              away: { name: m.team2 ? m.team2.teamName : "?", score: res ? res.pointsTeam2 : 0 },
+              competition: m.leagueName || "德甲 Bundesliga",
+              date: (m.matchDateTime || "").replace("T", " ").slice(0, 16),
               score: score, finished: fin, source: "openligadb", _real: true
             };
           }).catch(function () { return null; });
