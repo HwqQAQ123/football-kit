@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>运营后台 · 足球数据工具箱（仅所有者）</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">🔧</div>
+    <div><h1>运营后台（仅所有者访问）</h1><div class="sub">数据源 · 售卖平台 · 演示工具</div></div>
+  </header>
+  <div id="box"><!-- 由 JS 渲染 --></div>
+  <div class="footer">此页不面向普通用户，请勿公开链接。普通用户请访问 index.html / app.html。</div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/api.js"></script>
+<script>
+function $(id) { return document.getElementById(id); }
+function esc(s) { return (s || "").replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+function sellLoad() { try { return JSON.parse(localStorage.getItem("fb_sell")) || { name: "", url: "" }; } catch (e) { return { name: "", url: "" }; } }
+
+function render() {
+  var cfg = FB.api.load();
+  var sell = sellLoad();
+  var opts = Object.keys(FB.api.providers).map(function (k) {
+    var p = FB.api.providers[k];
+    return '<option value="' + k + '" ' + (k === cfg.provider ? "selected" : "") + '>' + p.name + '</option>';
+  }).join("");
+  var needKey = FB.api.providers[cfg.provider] ? FB.api.providers[cfg.provider].needKey : false;
+  $("box").innerHTML =
+    '<h2 style="margin:0 0 12px">数据源设置</h2>' +
+    '<div class="card"><div class="kpi"><div class="box" style="flex:2"><div class="k">数据源</div>' +
+    '<select id="prov" class="btn" style="width:100%;margin-top:6px" onchange="onProv()">' + opts + '</select></div>' +
+    '<div class="box" style="flex:2"><div class="k">API Key' + (needKey ? "（必填）" : "（无需）") + '</div>' +
+    '<input id="key" class="btn" style="width:100%;margin-top:6px" value="' + esc(cfg.key) + '" placeholder="粘贴你的 Key"></div></div>' +
+    '<div style="margin-top:12px"><button class="btn active" onclick="saveCfg()">保存配置</button> ' +
+    '<button class="btn" onclick="testConn()">测试连接</button> <span id="testMsg" class="note"></span></div>' +
+    '<div class="note" style="margin-top:8px">默认示例数据离线可用；OpenLigaDB 为德甲免费真实接口（无需 Key）；' +
+    'API-Football 为高级源（真实 xG/统计/射门），需在其官网注册获取 Key。</div>' +
+    '<h2 style="margin:18px 0 10px">售卖平台（付费内容承接）</h2>' +
+    '<div class="kpi"><div class="box" style="flex:1"><div class="k">平台名称</div>' +
+    '<input id="sellName" class="btn" style="width:100%;margin-top:6px" value="' + esc(sell.name) + '" placeholder="如 小鹅通 / 知识星球"></div>' +
+    '<div class="box" style="flex:2"><div class="k">售卖链接（用户去此处付款）</div>' +
+    '<input id="sellUrl" class="btn" style="width:100%;margin-top:6px" value="' + esc(sell.url) + '" placeholder="https://... 你的商品页"></div></div>' +
+    '<div style="margin-top:10px"><button class="btn active" onclick="saveSell()">保存售卖平台</button> <span id="sellMsg" class="note"></span></div>' +
+    '<div class="note" style="margin-top:8px">付费墙的「去购买」会跳转到此链接，真实收款由该平台完成，本产品不碰资金流。</div>' +
+    '<h2 style="margin:18px 0 10px">演示工具</h2>' +
+    '<div class="note">本地预览付费墙效果：' +
+    '<button class="btn" onclick="demoUnlock()">模拟已购（解锁）</button> ' +
+    '<button class="btn" onclick="demoLock()">重置（锁定）</button></div></div>';
+}
+function onProv() { render(); }
+function saveCfg() { var p = $("prov").value, k = $("key").value; FB.api.save({ provider: p, key: k }); $("testMsg").textContent = "已保存（在同一浏览器打开 app.html 即生效）。"; }
+function saveSell() { var n = $("sellName").value, u = $("sellUrl").value; localStorage.setItem("fb_sell", JSON.stringify({ name: n, url: u })); $("sellMsg").textContent = "已保存售卖平台。"; }
+function testConn() { $("testMsg").textContent = "测试中…"; FB.api.test().then(function (r) { $("testMsg").textContent = (r.ok ? "✅ " : "❌ ") + r.msg; }); }
+function demoUnlock() { localStorage.setItem("fb_paid", "1"); alert("已模拟解锁，请在 app.html 查看球员热图。"); }
+function demoLock() { localStorage.removeItem("fb_paid"); alert("已重置为锁定。"); }
+render();
+</script>
+</body>
+</html>

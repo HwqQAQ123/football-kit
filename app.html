@@ -20,8 +20,7 @@
       <a class="active" data-view="matches" onclick="APP.nav(this,'matches')">赛事中心</a>
       <a data-view="players" onclick="APP.nav(this,'players')">球员榜</a>
       <a data-view="teams" onclick="APP.nav(this,'teams')">球队库</a>
-      <a data-view="review" onclick="APP.nav(this,'review')">竞彩复盘</a>
-      <a data-view="settings" onclick="APP.nav(this,'settings')">数据源设置</a>
+      <a data-view="review" onclick="APP.nav(this,'review')">赛后复盘</a>
     </div>
     <div class="main" id="main"><!-- 由 JS 渲染 --></div>
   </div>
@@ -109,9 +108,8 @@ var APP = (function () {
         '<div class="box"><div class="v">' + esc(realMatch.away.name) + '</div><div class="k">客队</div></div>' +
         '<div class="box"><div class="v" style="font-size:13px">' + esc(realMatch.competition) + '</div><div class="k">联赛</div></div></div>' +
         '<div class="disclaimer" style="margin-top:8px">本场为真实比赛数据。OpenLigaDB 提供真实赛程与比分，但不含 xG / 射门坐标等高级指标。' +
-        '如需在看板里看到真实 xG、球队统计与射门分布，请在「数据源设置」中切换到 <b>API-Football</b> 并填入 Key。</div>' +
-        '<div style="margin-top:10px"><a class="btn" href="dashboard.html">→ 打开可视化看板（示例数据演示）</a> ' +
-        '<a class="btn" onclick="APP.nav(null,\'settings\')">→ 去设置真实高级数据源</a></div></div>';
+        '专业版可呈现真实 xG、球队统计与射门分布，详情请咨询本产品运营方。</div>' +
+        '<div style="margin-top:10px"><a class="btn" href="dashboard.html">→ 打开可视化看板（示例数据演示）</a></div></div>';
       return html;
     }
 
@@ -216,7 +214,7 @@ var APP = (function () {
   function renderPlaceholder(name) {
     var tips = {
       teams: "球队库：可按联赛、排名、近期战绩检索球队，并下钻到阵容与赛季数据。",
-      review: "竞彩复盘：复用 review.html 的合规复盘模板，按比赛生成结构化报告。"
+      review: "赛后复盘：复用 review.html 的合规复盘模板，按比赛生成结构化报告。"
     };
     return '<h2 style="margin:0 0 12px">' + name + '</h2><div class="card">' +
       (name === "review" ? '<a class="btn" href="review.html">→ 打开合规复盘模板</a>'
@@ -229,7 +227,6 @@ var APP = (function () {
     else if (view === "players") renderPlayers();
     else if (view === "teams") el("main").innerHTML = renderPlaceholder("teams");
     else if (view === "review") el("main").innerHTML = renderPlaceholder("review");
-    else if (view === "settings") renderSettings();
   }
   return {
     nav: function (a, v) {
