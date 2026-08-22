@@ -1,0 +1,113 @@
+:root{
+  --bg:#F5F6F8; --surface:#FFFFFF; --line:#E3E6EB; --line2:#D3D7DE;
+  --text:#1F2330; --muted:#6B7280; --faint:#9AA1AD;
+  --home:#185FA5; --home-soft:#E6F1FB;
+  --away:#A32D2D; --away-soft:#FCEBEB;
+  --green:#3B6D11; --amber:#BA7517; --purple:#534AB7;
+  --radius:14px; --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--home);text-decoration:none}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 20px 60px}
+header.top{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+header.top .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--home),#0C447C);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600}
+header.top h1{font-size:18px;margin:0;font-weight:600}
+header.top .sub{font-size:12px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:18px 18px 14px;margin-bottom:18px}
+.card h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.card h2 .tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);
+  border:1px solid var(--line);padding:2px 8px;border-radius:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+/* scoreboard */
+.score{display:flex;align-items:center;justify-content:center;gap:0;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:18px}
+.score .team{flex:1;display:flex;align-items:center;gap:12px;padding:18px 22px}
+.score .team.away{flex-direction:row-reverse;text-align:right}
+.score .badge{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:700;font-size:18px}
+.score .tname{font-weight:600;font-size:15px}
+.score .mid{display:flex;flex-direction:column;align-items:center;padding:0 10px}
+.score .sc{font-size:34px;font-weight:700;letter-spacing:2px}
+.score .xg{font-size:11px;color:var(--muted)}
+/* stat bars */
+.stat-row{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:13px}
+.stat-row .lbl{width:70px;text-align:right;color:var(--muted)}
+.stat-row .val{width:42px;font-weight:600}
+.stat-row .val.r{text-align:left}
+.bar{flex:1;height:8px;border-radius:6px;background:var(--away-soft);overflow:hidden;position:relative}
+.bar .fill{position:absolute;top:0;bottom:0;background:var(--home)}
+.bar.r{background:var(--home-soft)}
+.bar.r .fill{right:0;background:var(--away)}
+/* pitch */
+.pitch{position:relative;width:100%;background:#2E7D32;border-radius:10px;overflow:hidden}
+.pitch svg{display:block;width:100%;height:auto}
+.pitch .dot{position:absolute;transform:translate(-50%,-50%);border-radius:50%;
+  border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--surface);
+  color:var(--text);padding:7px 13px;border-radius:9px;font-size:13px;cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--home);color:var(--home)}
+.btn.active{background:var(--home);color:#fff;border-color:var(--home)}
+.toggle{display:flex;gap:8px;margin-bottom:10px}
+/* disclaimer */
+.disclaimer{background:#FFF7E6;border:1px solid #FAC775;border-radius:12px;padding:12px 14px;
+  font-size:12.5px;color:#7A5200;margin:10px 0}
+.disclaimer b{color:#633806}
+/* code */
+pre{background:#0C1322;color:#E6EDF3;border-radius:10px;padding:14px 16px;overflow:auto;font-size:12px;line-height:1.5}
+code{font-family:"SFMono-Regular",Consolas,monospace}
+/* app skeleton */
+.app{display:flex;min-height:80vh;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.side{width:200px;background:#0F1729;color:#C7D0E0;padding:16px 10px;flex:none}
+.side .brand{font-weight:600;color:#fff;padding:6px 10px 14px;font-size:14px}
+.side a{display:block;padding:9px 12px;border-radius:8px;color:#C7D0E0;font-size:13px;cursor:pointer}
+.side a:hover{background:#1C2740}
+.side a.active{background:var(--home);color:#fff}
+.main{flex:1;padding:18px 20px;overflow:auto}
+.match-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;cursor:pointer;transition:.15s}
+.match-card:hover{border-color:var(--home);box-shadow:var(--shadow)}
+.match-card .row{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.match-card .teams{font-weight:600}
+.match-card .score-mini{font-weight:700;font-size:16px}
+.match-card .meta{font-size:11px;color:var(--muted);margin-top:4px}
+.pill{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.pill.live{background:#FCEBEB;color:#A32D2D;border-color:#F09595}
+.kpi{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.kpi .box{flex:1;min-width:120px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.kpi .box .v{font-size:20px;font-weight:700}
+.kpi .box .k{font-size:11px;color:var(--muted)}
+.hidden{display:none}
+/* 付费墙（真实收款交给第三方平台，本产品仅展示） */
+.paywall{position:relative;border:1px dashed var(--amber);border-radius:12px;background:#FFF7E6;padding:22px 18px;text-align:center}
+.paywall .lock{font-size:13px;font-weight:700;color:#633806}
+.paywall .hint{font-size:12px;color:#92400E;margin:6px 0 12px}
+.paywall .actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.footer{font-size:12px;color:var(--faint);text-align:center;margin-top:30px}
+
+/* 打印 / 导出 PDF */
+.print-only{display:none}
+.print-watermark{display:none}
+@media print{
+  body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#000}
+  .wrap{max-width:100%;padding:8px 0 0;position:relative;z-index:1}
+  .btn,.toggle,.no-print{display:none!important}
+  .score,.card{border:1px solid #bbb;box-shadow:none;break-inside:avoid;margin-bottom:10px}
+  .score{background:#fff!important}
+  .pitch{break-inside:avoid}
+  .disclaimer{background:#FFF7E6!important;border:1px solid #FAC775!important;color:#7A5200!important;break-inside:avoid}
+  /* 付费版水印：固定铺底，每页重复，浅色大字 */
+  .print-watermark{display:block;position:fixed;top:46%;left:-6%;right:-6%;text-align:center;
+    font-size:74px;font-weight:800;letter-spacing:4px;color:#185FA5;opacity:.06;
+    transform:rotate(-22deg);white-space:nowrap;pointer-events:none;z-index:0}
+  #qr svg{width:100%!important;height:100%!important;display:block}
+  @page{margin:12mm}
+}

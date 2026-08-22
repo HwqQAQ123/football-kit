@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合规竞彩复盘模板 · 足球数据变现工具箱</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/qrcode.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <!-- 打印/PDF 水印：固定铺底，仅导出时显示 -->
+  <div class="print-watermark" id="wm">演示超级联赛 · 付费版报告</div>
+
+  <header class="top">
+    <div class="logo">📋</div>
+    <div><h1>竞彩复盘模板（合规向）</h1><div class="sub">路径④原型 · 仅作数据分析演示</div></div>
+    <div class="no-print" style="margin-left:auto;display:flex;align-items:center;gap:10px">
+      <span class="pill live">付费版</span>
+      <span id="buyWrap" class="no-print"></span>
+      <button class="btn active" onclick="window.print()">导出 PDF</button>
+    </div>
+  </header>
+
+  <div class="print-only" style="border-bottom:2px solid #185FA5;padding-bottom:6px;margin-bottom:12px">
+    <div style="display:flex;align-items:flex-end;gap:14px">
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:16px">合规竞彩复盘报告 · 付费版</div>
+        <div style="font-size:12px;color:#6B7280">生成时间：<span id="genTime"></span> ｜ 联赛：<span id="docLeague"></span></div>
+        <div style="font-size:12px;color:#6B7280">由「足球数据变现工具箱」生成，仅供数据研究，不构成购彩建议。</div>
+      </div>
+      <div style="text-align:center">
+        <div id="qr" style="width:84px;height:84px;background:#fff;border:1px solid #bbb"></div>
+        <div style="font-size:10px;color:#6B7280;margin-top:2px">扫码验证 / 购买</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <b>理性购彩提示：</b>本模板仅用于足球数据研究与科普，<b>不构成任何购彩建议</b>。体育彩票为国家发行之合法彩票，
+    请以娱乐心态参与，量力而行、不追号、不借贷投注。请遵守所在地法律法规，未成年人禁止购彩。
+  </div>
+
+  <!-- 复盘结构 -->
+  <div class="card">
+    <h2>复盘模板结构 <span class="tag">四段式</span></h2>
+    <div class="grid3">
+      <div class="kpi"><div class="box"><div class="k">① 基本面</div><div class="v" style="font-size:13px;font-weight:500">排名 / 伤停 / 战意</div></div></div>
+      <div class="kpi"><div class="box"><div class="k">② 数据面</div><div class="v" style="font-size:13px;font-weight:500">xG / 控球 / 射正</div></div></div>
+      <div class="kpi"><div class="box"><div class="k">③ 盘口面</div><div class="v" style="font-size:13px;font-weight:500">初盘 / 临盘 / 水位</div></div></div>
+    </div>
+    <div class="kpi"><div class="box" style="flex:1"><div class="k">④ 模型结论</div><div class="v" style="font-size:13px;font-weight:500">概率 / 价值空间 / 风险提示（不荐注）</div></div></div>
+  </div>
+
+  <!-- 数据结构 -->
+  <div class="card">
+    <h2>数据字段结构（schema） <span class="tag">给开发者</span></h2>
+    <pre><code>{
+  "match_id": "string",
+  "kickoff": "ISO8601",
+  "teams": { "home": "string", "away": "string" },
+  "odds": { "win": number, "draw": number, "lose": number, "asian_handicap": "string" },
+  "form":  { "home": ["W","D","L"], "away": ["W","D","L"] },
+  "h2h":   [ { "date": "ISO8601", "score": "string", "asian_result": "win|draw|lose" } ],
+  "model": { "home_prob": number, "draw_prob": number, "away_prob": number }
+}</code></pre>
+    <div class="note">本结构可直接对接接口抓取 / 数据库存储，作为复盘工具或小程序的数据底座。</div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>近 10 场战绩 <span class="tag">胜平负</span></h2>
+      <div id="formChart" style="height:200px"></div>
+    </div>
+    <div class="card">
+      <h2>历史交锋 <span class="tag">近 5 次</span></h2>
+      <div id="h2hChart" style="height:200px"></div>
+      <div class="note" id="h2hNote"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>让球盘路（近 10 场） <span class="tag" id="asianLine"></span></h2>
+    <div id="asianChart" style="height:220px"></div>
+    <div class="disclaimer" style="margin-top:12px" id="valueBox"></div>
+  </div>
+
+  <div class="footer">足球数据变现工具箱 · 示例数据，仅供研究演示，请理性购彩、遵守法规。</div>
+</div>
+
+<script src="assets/data.js"></script>
+<script>
+var R=FB.REVIEW;
+function el(id){return document.getElementById(id);}
+el('asianLine').textContent=R.asianLine;
+
+// 近10场战绩 堆叠
+(function(){
+  function count(arr){var w=0,d=0,l=0;arr.forEach(function(x){if(x==='W')w++;else if(x==='D')d++;else l++;});return [w,d,l];}
+  var h=count(R.homeForm), a=count(R.awayForm);
+  var c=echarts.init(el('formChart'));
+  c.setOption({
+    tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+    legend:{data:['胜','平','负'],top:0},
+    grid:{left:50,right:16,top:30,bottom:24},
+    xAxis:{type:'value'},
+    yAxis:{type:'category',data:[R.match.split(' vs ')[1],R.match.split(' vs ')[0]]},
+    series:[
+      {name:'胜',type:'bar',stack:'t',data:[h[0],a[0]],itemStyle:{color:'#3B6D11'}},
+      {name:'平',type:'bar',stack:'t',data:[h[1],a[1]],itemStyle:{color:'#BA7517'}},
+      {name:'负',type:'bar',stack:'t',data:[h[2],a[2]],itemStyle:{color:'#A32D2D'}}
+    ]
+  });
+  window.addEventListener('resize',function(){c.resize();});
+})();
+
+// 历史交锋
+(function(){
+  var win=0,draw=0,lose=0;
+  R.h2h.forEach(function(x){if(x.ar==='win')win++;else if(x.ar==='draw')draw++;else lose++;});
+  var c=echarts.init(el('h2hChart'));
+  c.setOption({
+    tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+    grid:{left:40,right:16,top:20,bottom:24},
+    xAxis:{type:'category',data:['主队胜','平','客队胜']},
+    yAxis:{type:'value',minInterval:1},
+    series:[{type:'bar',data:[
+      {value:win,itemStyle:{color:'#185FA5'}},
+      {value:draw,itemStyle:{color:'#BA7517'}},
+      {value:lose,itemStyle:{color:'#A32D2D'}}
+    ],label:{show:true,position:'top'}}]
+  });
+  el('h2hNote').textContent='近 5 次交锋：主队胜 '+win+' · 平 '+draw+' · 客队胜 '+lose;
+  window.addEventListener('resize',function(){c.resize();});
+})();
+
+// 让球盘路
+(function(){
+  var hist=R.asianHistory, cum=[], rate=0, sum=0;
+  hist.forEach(function(v,i){sum+=v;rate=sum/(i+1);cum.push(+(rate*100).toFixed(0));});
+  var c=echarts.init(el('asianChart'));
+  c.setOption({
+    tooltip:{trigger:'axis'},
+    legend:{data:['单场赢盘','累计命中率%'],top:0},
+    grid:{left:36,right:36,top:30,bottom:24},
+    xAxis:{type:'category',data:hist.map(function(_,i){return 'M'+(i+1);})},
+    yAxis:[{type:'value',name:'赢盘',min:0,max:1,splitNumber:1},
+           {type:'value',name:'%',min:0,max:100}],
+    series:[
+      {name:'单场赢盘',type:'bar',data:hist,itemStyle:{color:'#534AB7'}},
+      {name:'累计命中率%',type:'line',yAxisIndex:1,data:cum,smooth:true,
+        lineStyle:{width:3,color:'#BA7517'},itemStyle:{color:'#BA7517'}}
+    ]
+  });
+  var hit=hist.filter(function(x){return x===1;}).length;
+    el('valueBox').innerHTML='<b>盘路统计：</b>近 10 场赢盘 '+hit+' 场，累计命中率 '+cum[cum.length-1]+
+    '%。<br><b>价值提示：</b>'+R.valueNote+'（价值≠稳赢，仅供参考，切勿重注。）';
+  window.addEventListener('resize',function(){c.resize();});
+})();
+
+// 打印页眉时间 / 联赛 / 水印 / 付费二维码 + 售卖平台引导
+(function(){
+  var g=document.getElementById('genTime'); if(g) g.textContent=new Date().toLocaleString('zh-CN');
+  var dl=document.getElementById('docLeague'); if(dl) dl.textContent=R.league;
+  var wm=document.getElementById('wm'); if(wm) wm.textContent=R.league+' · 付费版报告';
+  // 读取售卖平台配置（与小程序共享 localStorage）
+  function escAttr(s){return (s||'').replace(/"/g,'%22');}
+  var sell={name:'',url:''}; try{ sell=JSON.parse(localStorage.getItem('fb_sell'))||sell; }catch(e){}
+  var bw=document.getElementById('buyWrap');
+  if(bw){ bw.innerHTML = sell.url
+    ? '<a class="btn active" href="'+escAttr(sell.url)+'" target="_blank" rel="noopener">去「'+(sell.name||'平台')+'」购买完整版</a>'
+    : '<span class="pill">未配置售卖平台</span>'; }
+  // 付费版二维码：指向售卖平台（真实收款在平台完成），未配置则用占位验证链接
+  try{
+    var url = sell.url || 'https://football-kit.example.com/v?r='+encodeURIComponent(R.match+'|'+R.league+'|'+Date.now());
+    if(typeof qrcode==='function'){
+      var qr=qrcode(0,'M'); qr.addData(url); qr.make();
+      var box=document.getElementById('qr');
+      if(box){ box.innerHTML=qr.createSvgTag({cellSize:2,margin:1});
+        var svg=box.querySelector('svg'); if(svg){svg.setAttribute('style','width:100%;height:100%;display:block');} }
+    }
+  }catch(e){ /* 离线无库时静默忽略 */ }
+})();
+</script>
+</body>
+</html>

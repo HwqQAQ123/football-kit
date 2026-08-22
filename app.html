@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>迷你足球数据小程序 · 足球数据变现工具箱</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">📱</div>
+    <div><h1>迷你足球数据小程序</h1><div class="sub">路径③原型 · 含球员榜/热图 + 真实接口</div></div>
+  </header>
+
+  <div class="app">
+    <div class="side">
+      <div class="brand">⚽ 数据助手</div>
+      <a class="active" data-view="matches" onclick="APP.nav(this,'matches')">赛事中心</a>
+      <a data-view="players" onclick="APP.nav(this,'players')">球员榜</a>
+      <a data-view="teams" onclick="APP.nav(this,'teams')">球队库</a>
+      <a data-view="review" onclick="APP.nav(this,'review')">竞彩复盘</a>
+      <a data-view="settings" onclick="APP.nav(this,'settings')">数据源设置</a>
+    </div>
+    <div class="main" id="main"><!-- 由 JS 渲染 --></div>
+  </div>
+  <div class="footer">足球数据变现工具箱 · 小程序骨架，可继续扩展为真实产品。</div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/api.js"></script>
+<script>
+var APP = (function () {
+  var view = "matches", filterLeague = "全部", matchesCache = [], playerTab = "goals", playerChart = null;
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return (s || "").replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+  // 售卖平台配置 + 付费墙（真实收款交给第三方平台，本产品仅展示）
+  function sellLoad() { try { return JSON.parse(localStorage.getItem("fb_sell")) || { name: "", url: "" }; } catch (e) { return { name: "", url: "" }; } }
+  function isPaid() { return localStorage.getItem("fb_paid") === "1"; }
+  function paywallHtml(title) {
+    var s = sellLoad(), url = s.url || "";
+    var go = url ? '<a class="btn active" href="' + esc(url) + '" target="_blank" rel="noopener">去「' + (s.name || "平台") + '」购买</a>'
+                 : '<span class="pill">未配置售卖平台（设置页填写）</span>';
+    return '<div class="paywall"><div class="lock">' + title + ' · 会员专享</div>' +
+      '<div class="hint">本内容为付费功能，真实收款在第三方平台完成，本产品仅做展示。</div>' +
+      '<div class="actions">' + go + '<button class="btn" onclick="APP.demoUnlock()">演示解锁</button></div></div>';
+  }
+
+  // ---------- 赛事中心（走真实接口层） ----------
+  function loadMatches() {
+    el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心</h2><div class="note">正在从数据源加载…</div>';
+    FB.api.listMatches().then(function (list) {
+      matchesCache = list || [];
+      renderMatches();
+    }).catch(function (e) {
+      el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心</h2><div class="disclaimer">加载失败：' + esc(e && e.message || e) + '（已回退示例数据）</div>';
+      matchesCache = FB.MATCHES; renderMatches();
+    });
+  }
+  function renderMatches() {
+    var leagues = ["全部"].concat([...new Set(matchesCache.map(function (x) { return x.league; }))]);
+    var pills = '<div style="margin-bottom:12px">' + leagues.map(function (l) {
+      return '<span class="pill ' + (l === filterLeague ? "live" : "") + '" style="cursor:pointer;margin-right:6px" onclick="APP.filter(\'' + l + '\')">' + l + '</span>';
+    }).join("") + '</div>';
+    var list = filterLeague === "全部" ? matchesCache : matchesCache.filter(function (x) { return x.league === filterLeague; });
+    var cards = list.map(function (m) {
+      var live = m.status === "进行中" ? '<span class="pill live">' + m.status + '</span>'
+        : m.status === "未开赛" ? '<span class="pill">' + m.status + '</span>' : '<span class="pill">' + m.status + '</span>';
+      return '<div class="match-card" onclick="APP.open(\'' + m.id + '\')"><div class="row"><span class="teams">' + esc(m.home) +
+        ' <span style="color:#9AA1AD">vs</span> ' + esc(m.away) + '</span><span class="score-mini">' + m.score + '</span></div>' +
+        '<div class="meta">' + m.league + ' · ' + m.time + ' ' + live + (m.hot ? ' · 🔥热门' : '') + '</div></div>';
+    }).join("");
+    var src = FB.api.load().provider;
+    var toggleBtn = '<button class="btn" style="margin-left:10px" onclick="APP.toggleReal()">' + (src === "mock" ? "看真实德甲 →" : "← 回示例数据") + '</button>';
+    el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心 <span class="pill">' + (src === "mock" ? "示例数据" : "真实接口:" + src) + '</span>' + toggleBtn + '</h2>' + pills + (cards || '<div class="note">暂无比赛</div>');
+  }
+  function detailView(id, realMatch) {
+    var m = matchesCache.find(function (x) { return x.id === id; });
+    if (!m) return renderMatches();
+    var kpis = [{ k: "联赛", v: m.league }, { k: "开赛", v: m.time }, { k: "状态", v: m.status }, { k: "比分", v: m.score }, { k: "热度", v: m.hot ? "🔥" : "—" }];
+    var html = '<div style="margin-bottom:12px"><a class="btn" onclick="APP.back()">← 返回列表</a></div>' +
+      '<h2 style="margin:0 0 12px">' + esc(m.home) + ' vs ' + esc(m.away) + '</h2>' +
+      '<div class="kpi">' + kpis.map(function (k) { return '<div class="box"><div class="v">' + k.v + '</div><div class="k">' + k.k + '</div></div>'; }).join("") + '</div>';
+
+    // 真实高级数据源返回了带 stats 的比赛对象 → 渲染数据快照
+    if (realMatch && realMatch.stats) {
+      var s = realMatch.stats, st = s.home, sa = s.away;
+      var hShots = (realMatch.shots && realMatch.shots.home ? realMatch.shots.home.length : 0);
+      var aShots = (realMatch.shots && realMatch.shots.away ? realMatch.shots.away.length : 0);
+      html += '<div class="card"><h2>本场数据快照 <span class="tag">来自真实接口' +
+        (m.source === "api_football" ? " · API-Football" : "") + '</span></h2><div class="kpi">' +
+        '<div class="box"><div class="v">' + realMatch.home.xg + '</div><div class="k">' + esc(realMatch.home.name) + ' xG</div></div>' +
+        '<div class="box"><div class="v">' + realMatch.away.xg + '</div><div class="k">' + esc(realMatch.away.name) + ' xG</div></div>' +
+        '<div class="box"><div class="v">' + st[0] + '%</div><div class="k">控球率</div></div>' +
+        '<div class="box"><div class="v">' + st[1] + '-' + sa[1] + '</div><div class="k">射门</div></div>' +
+        '<div class="box"><div class="v">' + st[2] + '-' + sa[2] + '</div><div class="k">射正</div></div></div>' +
+        (realMatch._approxShots ? '<div class="note">射门坐标为按球队进攻方向估算的近似位置（API-Football 事件不含球场坐标）；xG 与统计为真实数据。</div>' : '') +
+        '<a class="btn" href="dashboard.html">→ 打开完整可视化看板（示例数据演示）</a></div>';
+      return html;
+    }
+
+    // 真实基础数据（如 OpenLigaDB：有真实球队/比分，但无 xG/射门坐标）
+    if (realMatch && realMatch._real) {
+      var srcName = realMatch.source === "openligadb" ? "OpenLigaDB" : "API-Football";
+      html += '<div class="card"><h2>比赛信息 <span class="tag">真实数据 · ' + srcName + '</span></h2><div class="kpi">' +
+        '<div class="box"><div class="v">' + esc(realMatch.home.name) + '</div><div class="k">主队</div></div>' +
+        '<div class="box"><div class="v">' + realMatch.score + '</div><div class="k">' + (realMatch.finished ? "比分" : "未开赛") + '</div></div>' +
+        '<div class="box"><div class="v">' + esc(realMatch.away.name) + '</div><div class="k">客队</div></div>' +
+        '<div class="box"><div class="v" style="font-size:13px">' + esc(realMatch.competition) + '</div><div class="k">联赛</div></div></div>' +
+        '<div class="disclaimer" style="margin-top:8px">本场为真实比赛数据。OpenLigaDB 提供真实赛程与比分，但不含 xG / 射门坐标等高级指标。' +
+        '如需在看板里看到真实 xG、球队统计与射门分布，请在「数据源设置」中切换到 <b>API-Football</b> 并填入 Key。</div>' +
+        '<div style="margin-top:10px"><a class="btn" href="dashboard.html">→ 打开可视化看板（示例数据演示）</a> ' +
+        '<a class="btn" onclick="APP.nav(null,\'settings\')">→ 去设置真实高级数据源</a></div></div>';
+      return html;
+    }
+
+    if (id === "m1") {
+      html += '<div class="card"><h2>本场数据快照 <span class="tag">来自看板</span></h2><div class="kpi">' +
+        '<div class="box"><div class="v">2.34</div><div class="k">蓝鲸 xG</div></div>' +
+        '<div class="box"><div class="v">1.07</div><div class="k">红狼 xG</div></div>' +
+        '<div class="box"><div class="v">58%</div><div class="k">控球率</div></div>' +
+        '<div class="box"><div class="v">14-8</div><div class="k">射门</div></div></div>' +
+        '<a class="btn" href="dashboard.html">→ 打开完整可视化看板</a></div>';
+    } else {
+      html += '<div class="card"><div class="disclaimer">该场次为数据源占位，接好真实接口（含 xG/射门坐标）后即可在此渲染完整看板、竞彩复盘与球员热图。</div></div>';
+    }
+    return html;
+  }
+
+  // ---------- 球员榜 + 球员热图 ----------
+  function renderPlayers() {
+    var tabs = [["goals", "射手榜"], ["assists", "助攻榜"], ["xg", "xG 榜"]];
+    var tabHtml = '<div class="toggle">' + tabs.map(function (t) {
+      return '<button class="btn ' + (t[0] === playerTab ? "active" : "") + '" onclick="APP.setTab(\'' + t[0] + '\')">' + t[1] + '</button>';
+    }).join("") + '</div>';
+    var sorted = FB.PLAYERS.slice().sort(function (a, b) { return b[playerTab] - a[playerTab]; });
+    var rows = sorted.map(function (p, i) {
+      var c = FB.TEAM_COLORS[p.team] || "#888";
+      return '<div class="match-card" onclick="APP.openPlayer(\'' + p.id + '\')" style="display:flex;align-items:center;gap:12px">' +
+        '<div style="width:26px;font-weight:700;color:#9AA1AD">' + (i + 1) + '</div>' +
+        '<div style="width:10px;height:10px;border-radius:50%;background:' + c + '"></div>' +
+        '<div style="flex:1"><div style="font-weight:600">' + esc(p.name) + ' <span class="pill">' + p.pos + '</span></div>' +
+        '<div class="meta">' + esc(p.team) + '</div></div>' +
+        '<div style="font-weight:700;font-size:18px">' + p[playerTab] + '</div></div>';
+    }).join("");
+    el("main").innerHTML = '<h2 style="margin:0 0 12px">球员榜</h2>' + tabHtml + rows;
+  }
+  function renderPlayerDetail(id) {
+    var p = FB.PLAYERS.find(function (x) { return x.id === id; });
+    if (!p) return renderPlayers();
+    var c = FB.TEAM_COLORS[p.team] || "#888";
+    var html = '<div style="margin-bottom:12px"><a class="btn" onclick="APP.nav(null,\'players\')">← 返回球员榜</a></div>' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
+      '<div style="width:46px;height:46px;border-radius:12px;background:' + c + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">' + esc(p.name[0]) + '</div>' +
+      '<div><div style="font-weight:600;font-size:16px">' + esc(p.name) + ' <span class="pill">' + p.pos + '</span></div>' +
+      '<div class="meta">' + esc(p.team) + '</div></div></div>' +
+      '<div class="kpi">' +
+      '<div class="box"><div class="v">' + p.goals + '</div><div class="k">进球</div></div>' +
+      '<div class="box"><div class="v">' + p.assists + '</div><div class="k">助攻</div></div>' +
+      '<div class="box"><div class="v">' + p.xg + '</div><div class="k">xG</div></div>' +
+      '<div class="box"><div class="v">' + p.shots + '</div><div class="k">射门</div></div>' +
+      '<div class="box"><div class="v">' + p.passAcc + '%</div><div class="k">传球成功率</div></div></div>' +
+      '<div class="card"><h2>活动热区 <span class="tag">球场位置</span></h2>' +
+      (isPaid()
+        ? '<div id="pHot" style="height:280px"></div><div class="note">热区由偏好活动区域生成，可作为球员战术价值的直观卖点。</div>'
+        : paywallHtml("球员活动热图")) + '</div>';
+    el("main").innerHTML = html;
+    if (isPaid()) {
+      var grid = FB.buildPlayerHeatmap(p);
+      if (playerChart) playerChart.dispose();
+      playerChart = echarts.init(el("pHot"));
+      var data = [];
+      for (var i = 0; i < grid.length; i++) for (var j = 0; j < grid[i].length; j++) data.push([i, j, grid[i][j]]);
+      playerChart.setOption({
+        grid: { left: 30, right: 20, top: 20, bottom: 36, containLabel: true },
+        tooltip: { position: "top" },
+        xAxis: { type: "category", data: grid.map(function (_, i) { return i + 1; }), name: "长度→" },
+        yAxis: { type: "category", data: grid[0].map(function (_, j) { return j + 1; }), name: "宽度" },
+        visualMap: { min: 0, max: 60, calculable: true, orient: "horizontal", left: "center", bottom: 0, inRange: { color: ["#E6F1FB", "#85B7EB", c, "#0C447C"] } },
+        series: [{ type: "heatmap", data: data }]
+      });
+      window.addEventListener("resize", function () { if (playerChart) playerChart.resize(); });
+    }
+  }
+
+  // ---------- 设置（真实接口配置） ----------
+  function renderSettings() {
+    var cfg = FB.api.load();
+    var sell = sellLoad(); var paid = isPaid();
+    var opts = Object.keys(FB.api.providers).map(function (k) {
+      var p = FB.api.providers[k];
+      return '<option value="' + k + '" ' + (k === cfg.provider ? "selected" : "") + '>' + p.name + '</option>';
+    }).join("");
+    var needKey = FB.api.providers[cfg.provider] ? FB.api.providers[cfg.provider].needKey : false;
+    el("main").innerHTML =
+      '<h2 style="margin:0 0 12px">数据源设置</h2>' + (paid ? '<span class="pill live">会员已解锁（演示）</span>' : '<span class="pill">会员未解锁</span>') +
+      '<div class="card"><div class="kpi"><div class="box" style="flex:2"><div class="k">数据源</div>' +
+      '<select id="prov" class="btn" style="width:100%;margin-top:6px" onchange="APP.onProv()">' + opts + '</select></div>' +
+      '<div class="box" style="flex:2"><div class="k">API Key' + (needKey ? "（必填）" : "（无需）") + '</div>' +
+      '<input id="key" class="btn" style="width:100%;margin-top:6px" value="' + esc(cfg.key) + '" placeholder="粘贴你的 Key"></div></div>' +
+      '<div style="margin-top:12px"><button class="btn active" onclick="APP.saveCfg()">保存配置</button> ' +
+      '<button class="btn" onclick="APP.testConn()">测试连接</button> <span id="testMsg" class="note"></span></div>' +
+      '<h2 style="margin:18px 0 10px">售卖平台（付费内容承接）</h2>' +
+      '<div class="kpi"><div class="box" style="flex:1"><div class="k">平台名称</div>' +
+      '<input id="sellName" class="btn" style="width:100%;margin-top:6px" value="' + esc(sell.name) + '" placeholder="如 小鹅通 / 知识星球"></div>' +
+      '<div class="box" style="flex:2"><div class="k">售卖链接（用户去此处付款）</div>' +
+      '<input id="sellUrl" class="btn" style="width:100%;margin-top:6px" value="' + esc(sell.url) + '" placeholder="https://... 你的商品页"></div></div>' +
+      '<div style="margin-top:10px"><button class="btn active" onclick="APP.saveSell()">保存售卖平台</button> <span id="sellMsg" class="note"></span></div>' +
+      '<div class="note" style="margin-top:8px">付费墙的「去购买」会跳转到此链接，真实收款由该平台完成，本产品不碰资金流。演示阶段可点球员热图里的「演示解锁」模拟已购。</div>' +
+      '<div class="note" style="margin-top:10px">默认使用内置示例数据（离线可用）。配置后点击「保存配置」并切到「赛事中心」即可拉取真实比赛。' +
+      'OpenLigaDB 为德甲免费真实接口（无需 Key）；football-data.org 与 API-Football 需在对应官网注册获取 Key。' +
+      '其中 <b>API-Football 为高级源</b>，可返回真实 xG、球队统计与射门事件，点击比赛详情即可看到数据快照。</div></div>';
+  }
+
+  function renderPlaceholder(name) {
+    var tips = {
+      teams: "球队库：可按联赛、排名、近期战绩检索球队，并下钻到阵容与赛季数据。",
+      review: "竞彩复盘：复用 review.html 的合规复盘模板，按比赛生成结构化报告。"
+    };
+    return '<h2 style="margin:0 0 12px">' + name + '</h2><div class="card">' +
+      (name === "review" ? '<a class="btn" href="review.html">→ 打开合规复盘模板</a>'
+        : '<div class="disclaimer" style="margin:0">' + tips[name] + '</div>') +
+      '<div class="note" style="margin-top:10px">骨架占位页——保留导航与数据层，按需填充业务模块即可上线。</div></div>';
+  }
+
+  function render() {
+    if (view === "matches") loadMatches();
+    else if (view === "players") renderPlayers();
+    else if (view === "teams") el("main").innerHTML = renderPlaceholder("teams");
+    else if (view === "review") el("main").innerHTML = renderPlaceholder("review");
+    else if (view === "settings") renderSettings();
+  }
+  return {
+    nav: function (a, v) {
+      document.querySelectorAll(".side a").forEach(function (x) { x.classList.remove("active"); });
+      if (a) a.classList.add("active"); else document.querySelector('.side a[data-view="' + v + '"]').classList.add("active");
+      view = v; render();
+    },
+    open: function (id) {
+      el("main").innerHTML = '<h2 style="margin:0 0 12px">比赛详情</h2><div class="note">正在加载本场数据…</div>';
+      FB.api.getMatch(id).then(function (m) {
+        el("main").innerHTML = detailView(id, m);
+      }).catch(function () { el("main").innerHTML = detailView(id, null); });
+    },
+    back: function () { renderMatches(); },
+    filter: function (l) { filterLeague = l; renderMatches(); },
+    toggleReal: function () {
+      var c = FB.api.load();
+      var np = c.provider === "mock" ? "openligadb" : "mock";
+      FB.api.save({ provider: np, key: "" });
+      loadMatches();
+    },
+    setTab: function (t) { playerTab = t; renderPlayers(); },
+    openPlayer: function (id) { renderPlayerDetail(id); },
+    onProv: function () { renderSettings(); },
+    saveCfg: function () {
+      var p = el("prov").value, k = el("key").value;
+      FB.api.save({ provider: p, key: k });
+      el("testMsg").textContent = "已保存，请到「赛事中心」查看。";
+    },
+    saveSell: function () {
+      var n = el("sellName").value, u = el("sellUrl").value;
+      localStorage.setItem("fb_sell", JSON.stringify({ name: n, url: u }));
+      el("sellMsg").textContent = "已保存售卖平台。";
+    },
+    demoUnlock: function () {
+      localStorage.setItem("fb_paid", "1");
+      el("main").innerHTML = '<div class="disclaimer">演示模式已解锁（仅本地模拟）。正式环境需到售卖平台购买后由订单自动核销。</div>';
+      render();
+    },
+    testConn: function () {
+      el("testMsg").textContent = "测试中…";
+      FB.api.test().then(function (r) {
+        el("testMsg").textContent = (r.ok ? "✅ " : "❌ ") + r.msg;
+      });
+    },
+    render: render
+  };
+})();
+APP.render(); // 初始渲染
+</script>
+</body>
+</html>

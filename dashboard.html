@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>比赛数据可视化看板 · 足球数据变现工具箱</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">⚽</div>
+    <div><h1>比赛数据可视化看板</h1><div class="sub">路径①原型 · 示例数据演示</div></div>
+  </header>
+
+  <!-- 比分头图 -->
+  <div class="score">
+    <div class="team">
+      <div class="badge" id="hBadge"></div>
+      <div><div class="tname" id="hName"></div><div class="xg" id="hXg"></div></div>
+    </div>
+    <div class="mid"><div class="sc" id="sc"></div><div class="xg" id="comp"></div></div>
+    <div class="team away">
+      <div class="badge" id="aBadge"></div>
+      <div><div class="tname" id="aName"></div><div class="xg" id="aXg"></div></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <!-- 球队统计 -->
+    <div class="card">
+      <h2>球队核心数据 <span class="tag">对比</span></h2>
+      <div id="statBars"></div>
+      <div class="note">左蓝=主队，右红=客队；数值取自示例赛事。</div>
+    </div>
+    <!-- xG 时间线 -->
+    <div class="card">
+      <h2>预期进球(xG)累积曲线 <span class="tag">时间线</span></h2>
+      <div id="xgChart" style="height:230px"></div>
+      <div class="note">蓝鲸全场 xG 2.34 高于红狼 1.07，与比分走向一致。</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <!-- 射门分布 -->
+    <div class="card">
+      <h2>射门分布图 <span class="tag">球场坐标</span></h2>
+      <div class="pitch" id="shotPitch"></div>
+      <div class="legend">
+        <span><i style="background:#185FA5"></i>主队射门</span>
+        <span><i style="background:#A32D2D"></i>客队射门</span>
+        <span>○ 进球　◎ 中柱　× 被扑/偏出（点越大 xG 越高）</span>
+      </div>
+    </div>
+    <!-- 传球网络 -->
+    <div class="card">
+      <h2>传球网络 <span class="tag">4-3-3</span></h2>
+      <div class="toggle">
+        <button class="btn active" id="btnHome" onclick="FB_UI.showPass('home')">主队</button>
+        <button class="btn" id="btnAway" onclick="FB_UI.showPass('away')">客队</button>
+      </div>
+      <div class="pitch" id="passPitch"></div>
+      <div class="note">节点=球员位置，连线粗细=传球量（示例生成）。</div>
+    </div>
+  </div>
+
+  <!-- 热区 -->
+  <div class="card">
+    <h2>球队活动热区 <span class="tag">12×7 网格</span></h2>
+    <div class="toggle">
+      <button class="btn active" id="btnHHeat" onclick="FB_UI.showHeat('home')">主队</button>
+      <button class="btn" id="btnAHeat" onclick="FB_UI.showHeat('away')">客队</button>
+    </div>
+    <div id="heatChart" style="height:300px"></div>
+    <div class="note">颜色越亮代表该区域活动越密集（向对方禁区方向倾斜）。</div>
+  </div>
+
+  <div class="footer">足球数据变现工具箱 · 数据均为演示用虚构赛事，与任何真实比赛无关。</div>
+</div>
+
+<script src="assets/data.js"></script>
+<script>
+var M = FB.MATCH;
+function el(id){return document.getElementById(id);}
+
+// 比分头图
+el('hBadge').style.background = M.home.color; el('hBadge').textContent = M.home.short;
+el('aBadge').style.background = M.away.color; el('aBadge').textContent = M.away.short;
+el('hName').textContent = M.home.name; el('aName').textContent = M.away.name;
+el('hXg').textContent = 'xG ' + M.home.xg.toFixed(2);
+el('aXg').textContent = 'xG ' + M.away.xg.toFixed(2);
+el('sc').textContent = M.home.score + ' - ' + M.away.score;
+el('comp').textContent = M.competition + ' · ' + M.date;
+
+// 统计条
+(function(){
+  var html='';
+  for(var i=0;i<M.stats.labels.length;i++){
+    var h=M.stats.home[i], a=M.stats.away[i], tot=h+a||1;
+    var hp=(h/tot*100).toFixed(1), ap=(a/tot*100).toFixed(1);
+    html+='<div class="stat-row"><div class="lbl">'+M.stats.labels[i]+'</div>'+
+      '<div class="val">'+h+M.stats.unit[i]+'</div>'+
+      '<div class="bar"><div class="fill" style="width:'+hp+'%"></div></div>'+
+      '<div class="bar r"><div class="fill" style="width:'+ap+'%"></div></div>'+
+      '<div class="val r">'+a+M.stats.unit[i]+'</div></div>';
+  }
+  el('statBars').innerHTML=html;
+})();
+
+// xG 曲线
+(function(){
+  var c=echarts.init(el('xgChart'));
+  c.setOption({
+    grid:{left:36,right:16,top:24,bottom:28},
+    tooltip:{trigger:'axis'},
+    legend:{data:['蓝鲸','红狼'],right:0,top:0},
+    xAxis:{type:'category',data:M.xgTimeline.map(function(d){return d.m+'`';}),name:'分钟'},
+    yAxis:{type:'value',name:'累计 xG'},
+    series:[
+      {name:'蓝鲸',type:'line',smooth:true,data:M.xgTimeline.map(function(d){return d.h;}),
+        lineStyle:{width:3,color:'#185FA5'},itemStyle:{color:'#185FA5'},areaStyle:{opacity:.08}},
+      {name:'红狼',type:'line',smooth:true,data:M.xgTimeline.map(function(d){return d.a;}),
+        lineStyle:{width:3,color:'#A32D2D'},itemStyle:{color:'#A32D2D'},areaStyle:{opacity:.08}}
+    ]
+  });
+  window.addEventListener('resize',function(){c.resize();});
+})();
+
+// 球场 SVG（用于射门/传球底图）
+function pitchSVG(){
+  return '<svg viewBox="0 0 105 68" preserveAspectRatio="none">'+
+    '<rect x="0.5" y="0.5" width="104" height="67" fill="none" stroke="#ffffff" stroke-opacity="0.6"/>'+
+    '<line x1="52.5" y1="0" x2="52.5" y2="68" stroke="#fff" stroke-opacity="0.6"/>'+
+    '<circle cx="52.5" cy="34" r="9.15" fill="none" stroke="#fff" stroke-opacity="0.6"/>'+
+    '<rect x="0" y="22" width="16.5" height="24" fill="none" stroke="#fff" stroke-opacity="0.6"/>'+
+    '<rect x="89.5" y="22" width="16.5" height="24" fill="none" stroke="#fff" stroke-opacity="0.6"/>'+
+    '<rect x="0" y="29" width="5.5" height="10" fill="none" stroke="#fff" stroke-opacity="0.6"/>'+
+    '<rect x="99.5" y="29" width="5.5" height="10" fill="none" stroke="#fff" stroke-opacity="0.6"/>'+
+    '</svg>';
+}
+
+// 射门图
+(function(){
+  var p=el('shotPitch'); p.innerHTML=pitchSVG();
+  var all=[];
+  M.shots.home.forEach(function(s){all.push(Object.assign({team:'home'},s));});
+  M.shots.away.forEach(function(s){all.push(Object.assign({team:'away'},s));});
+  all.forEach(function(s){
+    var d=document.createElement('div'); d.className='dot';
+    var size=8+s.xg*34;
+    d.style.left=s.x+'%'; d.style.top=s.y+'%'; d.style.width=size+'px'; d.style.height=size+'px';
+    if(s.team==='home') d.style.background='rgba(24,95,165,.85)';
+    else d.style.background='rgba(163,45,45,.85)';
+    var sym='';
+    if(s.r==='goal') d.style.borderColor='#FFD54A';
+    else if(s.r==='post') d.style.borderStyle='dashed';
+    else if(s.r==='saved') d.style.borderColor='#fff';
+    else d.style.borderColor='rgba(255,255,255,.4)';
+    d.title=s.team+' '+s.r+' xG'+s.xg.toFixed(2)+' '+s.m+"'";
+    p.appendChild(d);
+  });
+})();
+
+// 传球网络
+var passState={team:'home'};
+function renderPass(){
+  var net=FB.buildPassNetwork(passState.team, passState.team==='home'?7:13);
+  var p=el('passPitch'); p.innerHTML=pitchSVG();
+  var map={}; net.nodes.forEach(function(n){map[n.id]=n;});
+  // 连线
+  net.edges.forEach(function(e){
+    var a=map[e.s], b=map[e.t];
+    if(!a||!b) return;
+    var line=document.createElement('div');
+    var x1=a.x/100*100, y1=a.y/100*100, x2=b.x/100*100, y2=b.y/100*100;
+    var len=Math.hypot(x2-x1,y2-y1), ang=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
+    line.style.position='absolute'; line.style.left=x1+'%'; line.style.top=y1+'%';
+    line.style.width=len+'%'; line.style.height='2px';
+    line.style.background='rgba(255,255,255,'+(0.18+e.v/120)+')';
+    line.style.transformOrigin='0 50%'; line.style.transform='rotate('+ang+'deg)';
+    p.appendChild(line);
+  });
+  // 节点
+  net.nodes.forEach(function(n){
+    var node=document.createElement('div');
+    node.style.position='absolute'; node.style.left=n.x+'%'; node.style.top=n.y+'%';
+    node.style.transform='translate(-50%,-50%)';
+    node.style.width='18px'; node.style.height='18px'; node.style.borderRadius='50%';
+    node.style.background= passState.team==='home' ? '#185FA5':'#A32D2D';
+    node.style.border='2px solid #fff'; node.style.color='#fff';
+    node.style.fontSize='9px'; node.style.display='flex'; node.style.alignItems='center';
+    node.style.justifyContent='center'; node.style.fontWeight='600';
+    node.textContent=n.n; node.title=n.id;
+    p.appendChild(node);
+  });
+}
+function setPassBtn(t){
+  el('btnHome').classList.toggle('active',t==='home');
+  el('btnAway').classList.toggle('active',t==='away');
+}
+window.FB_UI=window.FB_UI||{};
+window.FB_UI.showPass=function(t){passState.team=t;setPassBtn(t);renderPass();};
+renderPass();
+
+// 热区
+var heatState={team:'home'}, heatChart=echarts.init(el('heatChart'));
+function renderHeat(){
+  var grid=FB.buildHeatmap(heatState.team, heatState.team==='home'?3:9);
+  var data=[];
+  for(var i=0;i<grid.length;i++)for(var j=0;j<grid[i].length;j++)data.push([i,j,grid[i][j]]);
+  var color = heatState.team==='home' ? ['#E6F1FB','#85B7EB','#185FA5','#0C447C']
+                                     : ['#FCEBEB','#F7C1C1','#E24B4A','#A32D2D'];
+  heatChart.setOption({
+    grid:{left:30,right:20,top:20,bottom:40,containLabel:true},
+    tooltip:{position:'top'},
+    xAxis:{type:'category',data:grid.map(function(_,i){return i+1;}),name:'球场长度→',
+      splitArea:{show:false},axisLine:{lineStyle:{color:'#ccc'}}},
+    yAxis:{type:'category',data:grid[0].map(function(_,j){return j+1;}),name:'宽度',
+      splitArea:{show:false},axisLine:{lineStyle:{color:'#ccc'}}},
+    visualMap:{min:0,max:60,calculable:true,orient:'horizontal',left:'center',bottom:0,
+      inRange:{color:color}},
+    series:[{type:'heatmap',data:data,label:{show:false},
+      emphasis:{itemStyle:{shadowBlur:6,shadowColor:'rgba(0,0,0,.3)'}}}]
+  });
+}
+function setHeatBtn(t){
+  el('btnHHeat').classList.toggle('active',t==='home');
+  el('btnAHeat').classList.toggle('active',t==='away');
+}
+window.FB_UI.showHeat=function(t){heatState.team=t;setHeatBtn(t);renderHeat();};
+renderHeat();
+window.addEventListener('resize',function(){heatChart.resize();});
+</script>
+</body>
+</html>
