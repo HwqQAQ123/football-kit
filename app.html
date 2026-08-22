@@ -51,13 +51,14 @@ var APP = (function () {
     el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心</h2><div class="note">正在从数据源加载…</div>';
     FB.api.listMatches().then(function (list) {
       matchesCache = list || [];
-      renderMatches();
+      renderMatches(false);
     }).catch(function (e) {
-      el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心</h2><div class="disclaimer">加载失败：' + esc(e && e.message || e) + '（已回退示例数据）</div>';
-      matchesCache = FB.MATCHES; renderMatches();
+      var msg = (e && e.message) || String(e) || "网络请求失败";
+      matchesCache = FB.MATCHES;
+      renderMatches(true, msg);
     });
   }
-  function renderMatches() {
+  function renderMatches(failed, errMsg) {
     var leagues = ["全部"].concat([...new Set(matchesCache.map(function (x) { return x.league; }))]);
     var pills = '<div style="margin-bottom:12px">' + leagues.map(function (l) {
       return '<span class="pill ' + (l === filterLeague ? "live" : "") + '" style="cursor:pointer;margin-right:6px" onclick="APP.filter(\'' + l + '\')">' + l + '</span>';
@@ -71,8 +72,12 @@ var APP = (function () {
         '<div class="meta">' + m.league + ' · ' + m.time + ' ' + live + (m.hot ? ' · 🔥热门' : '') + '</div></div>';
     }).join("");
     var src = FB.api.load().provider;
+    var isRealSrc = src !== "mock";
+    var failBanner = failed && isRealSrc
+      ? '<div class="disclaimer" style="margin-bottom:10px">⚠️ 真实接口请求失败：' + esc(errMsg) + '。你现在看到的是<b>示例数据</b>（蓝鲸/红狼等队名是虚构的），不是真实球队。可能是因为你的网络连不到 OpenLigaDB，可尝试开启加速器后刷新。</div>'
+      : '';
     var toggleBtn = '<button class="btn" style="margin-left:10px" onclick="APP.toggleReal()">' + (src === "mock" ? "看真实德甲 →" : "← 回示例数据") + '</button>';
-    el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心 <span class="pill">' + (src === "mock" ? "示例数据" : "真实接口:" + src) + '</span>' + toggleBtn + '</h2>' + pills + (cards || '<div class="note">暂无比赛</div>');
+    el("main").innerHTML = '<h2 style="margin:0 0 12px">赛事中心 <span class="pill">' + (src === "mock" ? "示例数据" : "真实接口:" + src) + '</span>' + toggleBtn + '</h2>' + failBanner + pills + (cards || '<div class="note">暂无比赛</div>');
   }
   function detailView(id, realMatch) {
     var m = matchesCache.find(function (x) { return x.id === id; });
@@ -142,7 +147,7 @@ var APP = (function () {
         '<div class="meta">' + esc(p.team) + '</div></div>' +
         '<div style="font-weight:700;font-size:18px">' + p[playerTab] + '</div></div>';
     }).join("");
-    el("main").innerHTML = '<h2 style="margin:0 0 12px">球员榜</h2>' + tabHtml + rows;
+    el("main").innerHTML = '<h2 style="margin:0 0 12px">球员榜 <span class="pill">示例数据</span></h2><div class="note">当前球员为演示虚构数据，未接入真实球员统计接口。</div>' + tabHtml + rows;
   }
   function renderPlayerDetail(id) {
     var p = FB.PLAYERS.find(function (x) { return x.id === id; });
@@ -212,14 +217,14 @@ var APP = (function () {
   }
 
   function renderPlaceholder(name) {
-    var tips = {
-      teams: "球队库：可按联赛、排名、近期战绩检索球队，并下钻到阵容与赛季数据。",
-      review: "赛后复盘：复用 review.html 的合规复盘模板，按比赛生成结构化报告。"
-    };
-    return '<h2 style="margin:0 0 12px">' + name + '</h2><div class="card">' +
-      (name === "review" ? '<a class="btn" href="review.html">→ 打开合规复盘模板</a>'
-        : '<div class="disclaimer" style="margin:0">' + tips[name] + '</div>') +
-      '<div class="note" style="margin-top:10px">骨架占位页——保留导航与数据层，按需填充业务模块即可上线。</div></div>';
+    var titles = { teams: "球队库", review: "赛后复盘" };
+    if (name === "teams") {
+      return '<h2 style="margin:0 0 12px">' + titles[name] + ' <span class="pill">占位未实现</span></h2><div class="card">' +
+        '<div class="disclaimer" style="margin:0">球队库模块尚未实现。当前版本只接入了「赛事中心」的德甲赛程真实数据，球员榜/球队库仍为演示骨架。</div></div>';
+    }
+    return '<h2 style="margin:0 0 12px">' + titles[name] + '</h2><div class="card">' +
+      '<a class="btn" href="review.html">→ 打开合规复盘模板</a>' +
+      '<div class="note" style="margin-top:10px">赛后复盘模板已做好，可导出 PDF，但数据需要手动填写。</div></div>';
   }
 
   function render() {
